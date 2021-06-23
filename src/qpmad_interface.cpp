@@ -13,17 +13,18 @@ Rcpp::List solveqpImpl(Eigen::MatrixXd& H,
                        const Eigen::MatrixXd& A   ,
                        const Eigen::VectorXd& Alb,
                        const Eigen::VectorXd& Aub,
-                       bool isFactorized,
+                       int factorizationType,
                        int maxIter,
                        double tol,
-                       bool checkPD)
+                       bool returnInvertedCholeskyFactor,
+                       bool returnLagrangeMultipliers)
 {
 
   using namespace Rcpp;
 
 
   Eigen::VectorXd x(H.rows());
-
+  x.setConstant(NA_REAL);
 
   qpmad::Solver   solver;
   qpmad::SolverParameters pars;
@@ -31,77 +32,57 @@ Rcpp::List solveqpImpl(Eigen::MatrixXd& H,
 
   pars.tolerance_ = tol;
   pars.max_iter_ = maxIter;
-  if (isFactorized)
-  {
-    if (checkPD && (H.diagonal().array() < DBL_EPSILON).any())
-    {
-      x.setConstant(NA_REAL);
+  pars.return_inverted_cholesky_factor_ = returnInvertedCholeskyFactor;
+  pars.hessian_type_ = static_cast<qpmad::SolverParameters::HessianType>(factorizationType);
 
-      List reslist = List::create(_["solution"] = x,
-                                  _["status"] = -1,
-                                  _["message"] = "Numerical issue, matrix (probably) not positive definite");
-      return reslist;
-    }
-    pars.hessian_type_ = qpmad::SolverParameters::HESSIAN_CHOLESKY_FACTOR;
-  }
-  else if (checkPD)
-  {
-    Eigen::LLT<Eigen::Ref<Eigen::MatrixXd>, Eigen::Lower> chol(H);
-    if (chol.info() == Eigen::NumericalIssue)
-    {
-
-      x.setConstant(NA_REAL);
-      List reslist = List::create(_["solution"] = x,
-                                  _["status"] = -1,
-                                  _["message"] = "Numerical issue, matrix (probably) not positive definite");
-      return reslist;
-    }
-    pars.hessian_type_ = qpmad::SolverParameters::HESSIAN_CHOLESKY_FACTOR;
-  }
-
-
-
-  qpmad::Solver::ReturnStatus return_value;
-
-  try
-  {
-    return_value = solver.solve(x, H, h, lb, ub, A, Alb, Aub, pars);
-
-  }
-  catch(std::exception &e)
-  {
-    std::string emsg(e.what());
-    Rcpp::stop(emsg);
-  }
+  int retval = -1;
 
   Rcpp::String msg;
+  try {
+      auto return_value = solver.solve(x, H, h, lb, ub, A, Alb, Aub, pars);
+      retval = static_cast<int>(return_value);
+      switch (return_value) {
+      case qpmad::Solver::ReturnStatus::OK:
+          msg = "Ok";
+          break;
+      case qpmad::Solver::ReturnStatus::MAXIMAL_NUMBER_OF_ITERATIONS:
+          msg = "Maximal number of iterations reached";
+          break;
+      default:
+          stop("Unhandled return status [%i]", static_cast<int>(return_value));
+      }
 
-  switch(return_value)
-  {
-    case qpmad::Solver::ReturnStatus::OK:
-      msg = "Ok";
-      break;
-    case qpmad::Solver::ReturnStatus::INCONSISTENT:
-      msg = "Inconsistent constraints";
-      break;
-    case qpmad::Solver::ReturnStatus::INFEASIBLE_EQUALITY:
-      msg = "Infeasible equality";
-      break;
-    case qpmad::Solver::ReturnStatus::INFEASIBLE_INEQUALITY:
-      msg = "Infeasible inequality";
-      break;
-    case qpmad::Solver::ReturnStatus::MAXIMAL_NUMBER_OF_ITERATIONS:
-      msg = "Maximal number of iterations reached";
-      break;
-    default:
-      Rcpp::stop("Unknown status code returned [%i]", static_cast<int>(return_value));
-    break;
+  } catch (std::exception& e) {
+      msg = e.what();
   }
 
+  SEXP lagrangedf = R_NilValue;
+
+  if (retval == 0 && returnLagrangeMultipliers) {
+    Eigen::VectorXd lmult;
+    Eigen::Matrix<qpmad::MatrixIndex, Eigen::Dynamic, 1> lmultInd;
+    Eigen::Matrix<bool, Eigen::Dynamic, 1> islower;
+
+    solver.getInequalityDual(lmult, lmultInd, islower);
+
+    IntegerVector iv(lmultInd.data(), lmultInd.data() + lmultInd.size(), 
+                      [](qpmad::MatrixIndex x){return static_cast<int>(x) + 1;});
+    LogicalVector bv(islower.data(), islower.data() + islower.size());
+
+    lagrangedf = DataFrame::create(
+      _["multiplier"] = wrap(lmult),
+      _["index"] = iv,
+      _["isLower"] = bv
+    );
+
+  }
 
   return List::create(_["solution"] = x,
-                      _["status"] = static_cast <int>(return_value),
-                      _["message"] = msg);
+                      _["status"] = retval,
+                      _["message"] = msg,
+                      _["nIter"] = solver.getNumberOfInequalityIterations(),
+                      _["lagrangeMult"] =  lagrangedf,
+                      _["invHessian"] = returnInvertedCholeskyFactor ? wrap(H) : R_NilValue);
 }
 
 

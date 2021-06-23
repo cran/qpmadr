@@ -16,7 +16,8 @@ solveqp(
 )
 }
 \arguments{
-\item{H}{Symmetric \strong{positive definite} matrix, n*n. Only the lower triangular part is used.}
+\item{H}{Symmetric positive definite matrix, n*n. Can also be a (inverse) Cholesky factor cf.
+\code{\link{qpmadParameters}}.}
 
 \item{h}{\emph{Optional}, vector of length n.}
 

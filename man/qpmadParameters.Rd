@@ -8,27 +8,41 @@ qpmadParameters(
   isFactorized = FALSE,
   maxIter = -1,
   tol = 1e-12,
-  checkPD = TRUE
+  checkPD = TRUE,
+  factorizationType = "NONE",
+  withLagrMult = FALSE,
+  returnInvCholFac = FALSE
 )
 }
 \arguments{
-\item{isFactorized}{If \code{TRUE} then \code{H} is a lower Cholesky factor.}
+\item{isFactorized}{Deprecated, will be removed in a future version. Please use \code{factorizationType} instead. If
+\code{TRUE} then \code{H} is a lower Cholesky factor, overridden by\code{factorizationType}.}
 
 \item{maxIter}{Maximum number of iterations, if not positive then no limit.}
 
 \item{tol}{Convergence tolerance.}
 
-\item{checkPD}{If \code{FALSE} then \code{H} is assumed to be positive definite and no checks are made.}
+\item{checkPD}{Deprecated. Ignored, will be removed in a future release.}
+
+\item{factorizationType}{IF \code{"NONE"} then \code{H} is a Hessian (default), if \code{"CHOLESKY"} then \code{H} is
+a (lower) cholesky factor. If \code{"INV_CHOLESKY"} then \code{H} is the inverse of a cholesky factor, i.e. such that
+the Hessian is given by inv(HH').}
+
+\item{withLagrMult}{If \code{TRUE} then the Lagrange multipliers of the inequality constraints, along with their
+indexes and an upper / lower side indicator, will be returned.}
+
+\item{returnInvCholFac}{If \code{TRUE} then also return the inverse Cholesky factor of the Hessian.}
 }
 \value{
 a list suitable to be used as the pars-argument to \code{\link{solveqp}}
 }
 \description{
-Set qpmad parameters
+Conveniently set qpmad parameters. Please always use named arguments since parameters can change without notice
+between releases. In a future version specifying the argument names will be mandatory.
 }
 \examples{
 
-qpmadParameters(checkPD = TRUE)
+qpmadParameters(withLagrMult = TRUE)
 
 }
 \seealso{

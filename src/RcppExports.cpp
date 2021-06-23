@@ -7,8 +7,8 @@
 using namespace Rcpp;
 
 // solveqpImpl
-Rcpp::List solveqpImpl(Eigen::MatrixXd& H, const Eigen::VectorXd& h, const Eigen::VectorXd& lb, const Eigen::VectorXd& ub, const Eigen::MatrixXd& A, const Eigen::VectorXd& Alb, const Eigen::VectorXd& Aub, bool isFactorized, int maxIter, double tol, bool checkPD);
-RcppExport SEXP _qpmadr_solveqpImpl(SEXP HSEXP, SEXP hSEXP, SEXP lbSEXP, SEXP ubSEXP, SEXP ASEXP, SEXP AlbSEXP, SEXP AubSEXP, SEXP isFactorizedSEXP, SEXP maxIterSEXP, SEXP tolSEXP, SEXP checkPDSEXP) {
+Rcpp::List solveqpImpl(Eigen::MatrixXd& H, const Eigen::VectorXd& h, const Eigen::VectorXd& lb, const Eigen::VectorXd& ub, const Eigen::MatrixXd& A, const Eigen::VectorXd& Alb, const Eigen::VectorXd& Aub, int factorizationType, int maxIter, double tol, bool returnInvertedCholeskyFactor, bool returnLagrangeMultipliers);
+RcppExport SEXP _qpmadr_solveqpImpl(SEXP HSEXP, SEXP hSEXP, SEXP lbSEXP, SEXP ubSEXP, SEXP ASEXP, SEXP AlbSEXP, SEXP AubSEXP, SEXP factorizationTypeSEXP, SEXP maxIterSEXP, SEXP tolSEXP, SEXP returnInvertedCholeskyFactorSEXP, SEXP returnLagrangeMultipliersSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -19,17 +19,18 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type A(ASEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type Alb(AlbSEXP);
     Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type Aub(AubSEXP);
-    Rcpp::traits::input_parameter< bool >::type isFactorized(isFactorizedSEXP);
+    Rcpp::traits::input_parameter< int >::type factorizationType(factorizationTypeSEXP);
     Rcpp::traits::input_parameter< int >::type maxIter(maxIterSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
-    Rcpp::traits::input_parameter< bool >::type checkPD(checkPDSEXP);
-    rcpp_result_gen = Rcpp::wrap(solveqpImpl(H, h, lb, ub, A, Alb, Aub, isFactorized, maxIter, tol, checkPD));
+    Rcpp::traits::input_parameter< bool >::type returnInvertedCholeskyFactor(returnInvertedCholeskyFactorSEXP);
+    Rcpp::traits::input_parameter< bool >::type returnLagrangeMultipliers(returnLagrangeMultipliersSEXP);
+    rcpp_result_gen = Rcpp::wrap(solveqpImpl(H, h, lb, ub, A, Alb, Aub, factorizationType, maxIter, tol, returnInvertedCholeskyFactor, returnLagrangeMultipliers));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_qpmadr_solveqpImpl", (DL_FUNC) &_qpmadr_solveqpImpl, 11},
+    {"_qpmadr_solveqpImpl", (DL_FUNC) &_qpmadr_solveqpImpl, 12},
     {NULL, NULL, 0}
 };
 

@@ -1,6 +1,6 @@
 #' @useDynLib qpmadr, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
-#' @importFrom checkmate assert assertMatrix assertNumeric assertLogical assertIntegerish assertNumber
+#' @importFrom checkmate assert assertMatrix assertNumeric assertLogical assertIntegerish assertNumber assertChoice
 #' @importFrom utils modifyList
 NULL
 

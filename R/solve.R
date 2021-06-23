@@ -9,7 +9,8 @@
 #' \deqn{lb_i \leq x_i \leq ub_i}{lb_i \le x_i \le ub_i}
 #' \deqn{Alb_i \leq (A x)_i \leq Aub_i}{Alb_i \le (A x)_i \le Aub_i}
 #'
-#' @param H Symmetric \strong{positive definite} matrix, n*n. Only the lower triangular part is used.
+#' @param H Symmetric positive definite matrix, n*n. Can also be a (inverse) Cholesky factor cf.
+#' \code{\link{qpmadParameters}}.
 #' @param h \emph{Optional}, vector of length n.
 #' @param lb,ub \emph{Optional}, lower/upper bounds of \code{x}. Will be repeated n times if length is one.
 #' @param A  \emph{Optional}, constraints matrix of dimension p*n, where each row corresponds to a constraint. For equality constraints let corresponding elements in \code{Alb} equal those in \code{Aub}
@@ -101,12 +102,15 @@ solveqp = function(H, h=NULL, lb=NULL, ub=NULL, A=NULL, Alb=NULL, Aub=NULL, pars
   }
 
 
-  result = solveqpImpl(H, h, lb, ub, A, Alb, Aub, pars$isFactorized, pars$maxIter, pars$tol, pars$checkPD)
+  factorizationType = factorizationTypes[pars$factorizationType]
+
+  result = solveqpImpl(H, h, lb, ub, A, Alb, Aub, factorizationType, pars$maxIter, pars$tol, pars$returnInvCholFac, pars$withLagrMult)
 
   result
 }
 
 
+factorizationTypes = c(NONE=1L, CHOLESKY=2L, INV_CHOLESKY=3L)
 
 
 quadprog.solve.QP = function(Dmat, d, Amat, bvec, meq=0, factorized = FALSE) {
@@ -115,10 +119,8 @@ quadprog.solve.QP = function(Dmat, d, Amat, bvec, meq=0, factorized = FALSE) {
 
   Aub[seq_len(meq)] = bvec[seq_len(meq)]
 
-  if (isTRUE(factorized))
-    Dmat = t(solve(Dmat))
 
-  res = solveqp(Dmat, -d, A=t(Amat), Alb=bvec, Aub=Aub, pars=list(isFactorized = factorized))
+  res = solveqp(Dmat, -d, A=t(Amat), Alb=bvec, Aub=Aub, pars=list(factorizationType = if(factorized) "INV_CHOLESKY" else "NONE"))
 
   x = res$solution
   return(list(solution = x,
@@ -133,32 +135,63 @@ quadprog.solve.QP = function(Dmat, d, Amat, bvec, meq=0, factorized = FALSE) {
 
 
 
+
 #' Set qpmad parameters
 #'
-#' @param isFactorized If \code{TRUE} then \code{H} is a lower Cholesky factor.
+#' Conveniently set qpmad parameters. Please always use named arguments since parameters can change without notice
+#' between releases. In a future version specifying the argument names will be mandatory.
+#'
+#' @param isFactorized Deprecated, will be removed in a future version. Please use \code{factorizationType} instead. If
+#' \code{TRUE} then \code{H} is a lower Cholesky factor, overridden by\code{factorizationType}.
 #' @param maxIter Maximum number of iterations, if not positive then no limit.
 #' @param tol Convergence tolerance.
-#' @param checkPD If \code{FALSE} then \code{H} is assumed to be positive definite and no checks are made.
+#' @param checkPD Deprecated. Ignored, will be removed in a future release.
+#' @param factorizationType IF \code{"NONE"} then \code{H} is a Hessian (default), if \code{"CHOLESKY"} then \code{H} is
+#' a (lower) cholesky factor. If \code{"INV_CHOLESKY"} then \code{H} is the inverse of a cholesky factor, i.e. such that
+#' the Hessian is given by inv(HH').
+#' @param withLagrMult If \code{TRUE} then the Lagrange multipliers of the inequality constraints, along with their
+#' indexes and an upper / lower side indicator, will be returned.
+#' @param returnInvCholFac If \code{TRUE} then also return the inverse Cholesky factor of the Hessian.
 #'
 #' @return a list suitable to be used as the pars-argument to \code{\link{solveqp}}
 #' @seealso \code{\link{solveqp}}
 #'
 #' @examples
 #'
-#' qpmadParameters(checkPD = FALSE)
+#' qpmadParameters(withLagrMult = TRUE)
 #'
 #' @export
-qpmadParameters = function(isFactorized = FALSE, maxIter = -1, tol = 1e-12, checkPD = TRUE) {
+qpmadParameters = function(isFactorized = FALSE, maxIter = -1, tol = 1e-12, checkPD = TRUE,
+                           factorizationType = "NONE", withLagrMult = FALSE, returnInvCholFac = FALSE) {
 
-  list(isFactorized=isFactorized, maxIter=maxIter, tol=tol, checkPD=checkPD)
+  if (!missing(isFactorized)) {
+    warning('Parameter \'isFactorized\' is deprecated, use \'factorizationType\' instead. See help("qpmadParameters", "qpmadr")')
+    if (!missing(factorizationType))
+      factorizationType = if(isFactorized) "CHOLESKY" else "NONE"
+  }
+
+  if (!missing(checkPD)) {
+    warning('Parameter \'checkPD\' is deprecated, ignored. See help("qpmadParameters", "qpmadr")')
+  }
+
+  list(factorizationType=factorizationType, maxIter=maxIter, tol=tol, withLagrMult=withLagrMult, returnInvCholFac=returnInvCholFac)
 
 }
 
 
-.defaultPars = list(isFactorized = FALSE, maxIter = -1, tol = 1e-12, checkPD = TRUE)
+.defaultPars = list(factorizationType = "NONE", maxIter = -1, tol = 1e-12, withLagrMult = FALSE, returnInvCholFac = FALSE)
 
 validateQpmadPars = function(pars) {
 
+  if (utils::hasName(pars, "isFactorized")) {
+    warning('Parameter \'isFactorized\' is deprecated, use \'factorizationType\' instead. See help("qpmadParameters", "qpmadr")')
+    if (!utils::hasName(pars, "factorizationType"))
+      pars$factorizationType = if(isTRUE(pars$isFactorized)) "CHOLESKY" else "NONE"
+  }
+
+  if (utils::hasName(pars, "checkPD")) {
+    message('Parameter \'checkPD\' is deprecated, ignored. See help("qpmadParameters", "qpmadr")')
+  }
   pars = modifyList(.defaultPars, pars)
 
   assertNumber(pars$tol, lower = 0, .var.name="tol")
@@ -166,9 +199,12 @@ validateQpmadPars = function(pars) {
 
   assertIntegerish(pars$maxIter, any.missing = FALSE, len = 1, .var.name="maxIter")
 
-  assertLogical(pars$isFactorized, any.missing = FALSE, len = 1, .var.name="isFactorized")
+  assertChoice(pars$factorizationType, c("NONE", "CHOLESKY", "INV_CHOLESKY"), null.ok = FALSE,
+               .var.name = "factorizationType")
 
-  assertLogical(pars$checkPD, any.missing = FALSE, len = 1, .var.name="checkPD")
+  assertLogical(pars$withLagrMult, any.missing = FALSE, len = 1, .var.name="withLagrMult")
+
+  assertLogical(pars$returnInvCholFac, any.missing = FALSE, len = 1, .var.name="returnInvCholFac")
 
   pars
 }

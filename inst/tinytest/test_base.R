@@ -1,5 +1,6 @@
 
 library(qpmadr)
+library(tinytest)
 
 n = 6
 k = 3
@@ -7,6 +8,7 @@ k = 3
 set.seed(42)
 
 Q = crossprod(matrix(rnorm(n*n), n))
+invQchol = solve(chol(Q))
 Q0 = Q
 Q0[1,1] = 0
 A = matrix(5, k, n)
@@ -24,13 +26,15 @@ expect_true(all(is.finite(solveqp(Q, A=A, Alb=Alb)$solution)))
 
 
 resLlt = solveqp(Q, A=A, Alb=Alb)
-resQpm = solveqp(Q, A=A, Alb=Alb, pars = list(checkPD = FALSE))
-resChol = solveqp(t(chol(Q)), A=A, Alb=Alb, pars = list(isFactorized=TRUE, checkPD = FALSE))
+resQpm = solveqp(t(chol(Q)), A=A, Alb=Alb, pars = list(factorizationType="CHOLESKY"))
+resChol = solveqp(invQchol, A=A, Alb=Alb, pars = list(factorizationType="INV_CHOLESKY"))
 
 expect_equal(resLlt, resQpm)
 expect_equal(resLlt, resChol)
 
-set.seed(42)
-Q1 = crossprod(matrix(rnorm(n*n), n))
-expect_equal(Q, Q1)
+
+resFull = solveqp(Q, A=A, Alb=Alb, pars=qpmadr::qpmadParameters(withLagrMult = TRUE, returnInvCholFac = TRUE))
+
+expect_inherits(resFull$lagrangeMult, "data.frame")
+expect_equal(resFull$invHessian[upper.tri(Q)], invQchol[upper.tri(Q)])
 
